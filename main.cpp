@@ -414,7 +414,7 @@ void singularityEFIE(double &det1, double &AR1, double &AR2, double* p1, double*
 
 
 
-void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinfo> &Triangles, Points &points, unsigned int Nt, unsigned int maxele, int numprocs, int rank)
+void assemble_system_matrix(vector<COMPLEX> &Alocal, vector<int>&indicesROW, vector<int>&indicesCOL, Mesh &mesh, vector<Trianinfo> &Triangles, Points &points, unsigned int Nt, unsigned int maxele, int numprocs, int rank)
 
 
 {
@@ -427,6 +427,8 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 	vector<vector<double>> PointsS = points.getPointsS();
 
 	vector<double> WeightsS = points.getWeightsS();
+
+	int index =0;
 
 		// Inicijalizacija pomocnih promenljivih
 		double* pomocvF = new double[3];
@@ -641,7 +643,14 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 					const int s2 = (tmp2 < 0) ? -1 : 1;
 					const int j2 = int(tmp2 * s2 - 1);
 
-					Alocal[j1*maxele + j2] += double(1 / (4 * PI))*double(s1 * s2) * alok1[i1 * 3 + i2];
+					Alocal[index] = double(1 / (4 * PI))*double(s1 * s2) * alok1[i1 * 3 + i2];
+                                        
+				 	indicesROW[index]=j1;
+					
+					indicesCOL[index]=j2;
+
+                                    	++index;
+
 
 
 				}
@@ -656,36 +665,67 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 }
 
 
-void send_data(vector<COMPLEX> &local_data, int n, int numprocs, int my_rank) {
+void send_data(vector<COMPLEX> &Alocal, vector<int> &indicesROW, vector<int> &indicesCOL, int SIZElocal, int numprocs, int my_rank) {
 
-	int SIZE = n*n;
 
-	MPI_Send(&local_data[0], SIZE, MPI_DOUBLE_COMPLEX, 0, 1, MPI_COMM_WORLD);
+	MPI_Send(&Alocal[0], SIZElocal, MPI_DOUBLE_COMPLEX, 0, 1, MPI_COMM_WORLD);
+	
+	MPI_Send(&indicesROW[0], SIZElocal, MPI_INT, 0, 2, MPI_COMM_WORLD);
+
+	MPI_Send(&indicesCOL[0], SIZElocal, MPI_INT, 0, 3, MPI_COMM_WORLD);
+        
 }
 
-void receive_data(vector<COMPLEX> &A, int n, int numprocs) {
+void receive_data(vector<COMPLEX> &A, int n, int Nt, int numprocs) {
 
-	int SIZE = n*n;
 
-	vector<COMPLEX> temp(SIZE);
 
 
 for (int rank = 1; rank < numprocs; ++rank) {
 
+        int gran1 = (Nt / (numprocs - 1))*(rank - 1);
 
-	MPI_Recv(&temp[0], SIZE, MPI_DOUBLE_COMPLEX, rank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	int gran2;
 
+	if(rank<(numprocs-1)) {
 
- for (int j1 = 0; j1 < n; ++j1){
-
-
-	for (int j2 = 0; j2 != n; ++j2) {
-
-
-		A[j1*n + j2] += temp[j1*n + j2];
-
+	 gran2 = (rank)*(Nt / (numprocs - 1));
 
 	}
+
+	else {
+
+	 gran2 = Nt;
+
+	}
+
+        int SIZElocal = 9*Nt*(gran2-gran1);
+
+        vector<COMPLEX> Alocal(SIZElocal);
+
+	vector<int> indicesROW(SIZElocal);
+
+	vector<int> indicesCOL(SIZElocal);
+     	
+
+
+	MPI_Recv(&Alocal[0], SIZElocal, MPI_DOUBLE_COMPLEX, rank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+     	MPI_Recv(&indicesROW[0], SIZElocal, MPI_INT, rank, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        MPI_Recv(&indicesCOL[0], SIZElocal, MPI_INT, rank, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+
+ for (int i = 0; i < SIZElocal; ++i){
+
+
+	int j1=indicesROW[i];
+      	
+	int j2=indicesCOL[i];
+
+	A[j1*n + j2] += Alocal[i];
+
+
 
 }
 
@@ -795,24 +835,46 @@ int main(int args, char *argv[]) {
 
 	Points points;
 
-	int SIZE = maxele*maxele;
-	vector<COMPLEX> Aglobal(SIZE);
-	vector<COMPLEX> Alocal(SIZE);
-
-	fill(Aglobal.begin(), Aglobal.end(), COMPLEX(0));
-	fill(Alocal.begin(), Alocal.end(), COMPLEX(0));
+	
 
 	if (my_rank != 0) {
 
-		assemble_system_matrix(Alocal, mesh, Triangles, points, Nt, maxele, numprocs, my_rank);
+                int gran1 = (Nt / (numprocs - 1))*(my_rank - 1);
 
-		send_data(Alocal, maxele, numprocs, my_rank);
+		int gran2;
+		if(my_rank<(numprocs-1)) {
+		 gran2 = (my_rank)*(Nt / (numprocs - 1));
+		}
+		else {
+	       gran2 = Nt;
+		}
+
+        int SIZElocal = 9*Nt*(gran2-gran1);
+
+	vector<COMPLEX> Alocal(SIZElocal);
+	
+	fill(Alocal.begin(), Alocal.end(), COMPLEX(0));
+
+        vector<int> indicesROW(9*Nt*(gran2-gran1));
+
+        vector<int> indicesCOL(9*Nt*(gran2-gran1));
+
+      
+		 assemble_system_matrix(Alocal, indicesROW, indicesCOL, mesh, Triangles, points, Nt, maxele, numprocs, my_rank);
+
+		 send_data(Alocal,indicesROW,indicesCOL, SIZElocal, numprocs, my_rank);
 	}
 	else {
 
 	start = clock();
 
-	receive_data(Aglobal, maxele, numprocs);
+           int SIZEglobal = maxele*maxele;
+
+           vector<COMPLEX> Aglobal(SIZEglobal); 
+                 
+           fill(Aglobal.begin(), Aglobal.end(), COMPLEX(0));
+
+	receive_data(Aglobal, maxele, Nt, numprocs);
 
 	end = clock();
 
@@ -830,7 +892,6 @@ int main(int args, char *argv[]) {
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
         cout << cpu_time_used << endl;
-
 	}
 
 	MPI_Finalize();
