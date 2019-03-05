@@ -434,11 +434,11 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 		double* RWGf = new double[3];
 		double* RWGs = new double[3];
 
-		int gran1 = (Nt / (numprocs - 1))*(rank - 1);
+		int gran1 = (Nt / (numprocs))*(rank);
 
 		int gran2;
 		if(rank<(numprocs-1)) {
-		 gran2 = (rank)*(Nt / (numprocs - 1));
+		 gran2 = (rank+1)*(Nt / (numprocs));
 		}
 		else {
 	       gran2 = Nt;
@@ -656,24 +656,20 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 }
 
 
-void send_data(vector<COMPLEX> &local_data, int n, int numprocs, int my_rank) {
+void send_data(vector<COMPLEX> &Alocal, int SIZE, int rankSEN) {
 
-	int SIZE = n*n;
 
-	MPI_Send(&local_data[0], SIZE, MPI_DOUBLE_COMPLEX, 0, 1, MPI_COMM_WORLD);
+	MPI_Send(&Alocal[0], SIZE, MPI_DOUBLE_COMPLEX, rankSEN, 1, MPI_COMM_WORLD);
+    
 }
 
-void receive_data(vector<COMPLEX> &A, int n, int numprocs) {
+void receive_data(vector<COMPLEX> &Alocal, int n, int rankRCV) {
 
 	int SIZE = n*n;
 
-	vector<COMPLEX> temp(SIZE);
+	vector<COMPLEX> Atemp(SIZE);
 
-
-for (int rank = 1; rank < numprocs; ++rank) {
-
-
-	MPI_Recv(&temp[0], SIZE, MPI_DOUBLE_COMPLEX, rank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	MPI_Recv(&Atemp[0], SIZE, MPI_DOUBLE_COMPLEX, rankRCV, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 
  for (int j1 = 0; j1 < n; ++j1){
@@ -682,16 +678,16 @@ for (int rank = 1; rank < numprocs; ++rank) {
 	for (int j2 = 0; j2 != n; ++j2) {
 
 
-		A[j1*n + j2] += temp[j1*n + j2];
+		Alocal[j1*n + j2] += Atemp[j1*n + j2];
 
+
+		}
 
 	}
 
 }
 
-	}
-}
-
+//BInary tree in sending and receiving process implemented, number of processes has to be 2^n, including the zeroth process
 
 
 int main(int args, char *argv[]) {
@@ -767,8 +763,8 @@ int main(int args, char *argv[]) {
 	unsigned int Nt = (topol.size()) / 3;  //number of triangles
 
 
-
 	vector<Trianinfo> Triangles;
+
 	int maxele = 1;
 
 	for (int i = 0; i < trian.size(); ++i) {
@@ -792,37 +788,59 @@ int main(int args, char *argv[]) {
 	}
 
 
-
 	Points points;
 
 	int SIZE = maxele*maxele;
-	vector<COMPLEX> Aglobal(SIZE);
+
+        
+
 	vector<COMPLEX> Alocal(SIZE);
 
-	fill(Aglobal.begin(), Aglobal.end(), COMPLEX(0));
 	fill(Alocal.begin(), Alocal.end(), COMPLEX(0));
 
-	if (my_rank != 0) {
+                start = clock(); //start clock
+                 
 
 		assemble_system_matrix(Alocal, mesh, Triangles, points, Nt, maxele, numprocs, my_rank);
 
-		send_data(Alocal, maxele, numprocs, my_rank);
+            
+       	       int treesize=int(log2(numprocs));
+
+
+	for (int i = 1; i <= treesize; ++i) {	
+
+              
+	   if((my_rank % int(pow(2,i)))==0){
+
+                int rankRCV=my_rank+int(pow(2,i-1)); // receiving from this rank
+
+		receive_data(Alocal, maxele, rankRCV);
+              }
+	    
+           else if((my_rank % int(pow(2,i)))==int(pow(2,i-1))){
+
+                int rankSEN=my_rank - int(pow(2,i-1)); //destination rank, sending to this rank
+
+		send_data(Alocal, SIZE, rankSEN);
+
+              }
+ 		 
+
 	}
-	else {
 
-	start = clock();
+              end = clock(); //end clock
 
-	receive_data(Aglobal, maxele, numprocs);
-
-	end = clock();
+    if(my_rank==0){
 
    COMPLEX zbroj = COMPLEX(0);
 
    for (int i = 0; i < maxele; ++i) {
+
 		for (int j = 0; j < maxele; ++j) {
 
-			zbroj = zbroj + Aglobal[i*maxele + j];
+			zbroj = zbroj + Alocal[i*maxele + j];
 		}
+
 	}
 
 	cout << zbroj << endl;
@@ -831,7 +849,7 @@ int main(int args, char *argv[]) {
 
         cout << cpu_time_used << endl;
 
-	}
+		}
 
 	MPI_Finalize();
 
