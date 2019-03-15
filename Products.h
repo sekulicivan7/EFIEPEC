@@ -4,16 +4,14 @@
 
 using namespace std;
 
-inline double* cross( double* u,
+inline void cross(double* res, double* u,
 	 double* v)
 {
 
-	double *vec = new double[3];
-	vec[0] = *(u+1) *  *(v+2) - *(u+2) *  *(v+1);
-	vec[1] = *(u+2) * *(v) - *(u) * *(v+2);
-	vec[2] = *(u) * *(v+1) - *(u+1) * *(v);
+	res[0] = *(u+1) *  *(v+2) - *(u+2) *  *(v+1);
+	res[1] = *(u+2) * *(v) - *(u) * *(v+2);
+	res[2] = *(u) * *(v+1) - *(u+1) * *(v);
 	
-	return &vec[0];
 }
 
 
@@ -25,15 +23,15 @@ inline double* cross( double* u,
 
 
    template<typename T>
-   inline T* dividecon(T* uvec, double &CONST)
+   inline void dividecon(T* res, T* uvec, double &CONST)
    {
 	
-	   T *POM = new T[3];
-	   POM[0] = *uvec / CONST;
-	   POM[1] = *(uvec+1) / CONST;
-	   POM[2] = *(uvec+2) / CONST;
 
-	   return &POM[0];
+	   res[0] = *uvec / CONST;
+	   res[1] = *(uvec+1) / CONST;
+	   res[2] = *(uvec+2) / CONST;
+
+
    }
 
 	template<typename T>
@@ -81,14 +79,11 @@ inline double* cross( double* u,
 	  }
 
 	  template<typename T>
-	  inline  T* add(T* uvec, T* vvec)
+	  inline  void add(T* res, T* uvec, T* vvec)
 	  {
 
-		  T *zbroj = new T[3];
+		  res[0] = *uvec + *vvec;
+		  res[1] = *(uvec+1) + *(vvec+1);
+		  res[2] = *(uvec+2) + *(vvec+2);
 
-		  zbroj[0] = *uvec + *vvec;
-		  zbroj[1] = *(uvec+1) + *(vvec+1);
-		  zbroj[2] = *(uvec+2) + *(vvec+2);
-
-		  return &zbroj[0];
 	  }

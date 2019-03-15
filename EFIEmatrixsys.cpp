@@ -82,6 +82,7 @@ vector<double*> U(3);
 	double* p2nulvec = new double(3);
 	double* p3nulvec = new double(3);
 	double* pomVEC = new double(3);
+	double* pomVec2= new double(3);;
 	double* pomocvF = new double(3);
 	double* pomocvS = new double(3);
 	double* pomNvec = new double(3);
@@ -125,23 +126,23 @@ vector<double*> U(3);
 
 	subtract(rhotmp, rho2, rho1);
 
-	l1 = dividecon(rhotmp, norm1);
+	dividecon(l1, rhotmp, norm1);
 
 	subtract(rhotmp, rho3, rho2);
 	norm1 = norm(rhotmp);
 
 	subtract(rhotmp, rho3, rho2);
-	l2 = dividecon(rhotmp, norm1);
+	dividecon(l2, rhotmp, norm1);
 
 	subtract(rhotmp, rho1, rho3);
 	norm1 = norm(rhotmp);
-	l3 = dividecon(rhotmp, norm1);
+	dividecon(l3, rhotmp, norm1);
 
 
 
-	u1 = cross(l1, &nvec2[0]);
-	u2 = cross(l2, &nvec2[0]);
-	u3 = cross(l3, &nvec2[0]);
+	cross(u1, l1, &nvec2[0]);
+	cross(u2, l2, &nvec2[0]);
+	cross(u3, l3, &nvec2[0]);
 
 
 	U[0] = u1;
@@ -237,7 +238,7 @@ vector<double*> U(3);
 			multconst(POM2, l1, l1pl);
 			subtract(POM, POM1, POM2);
 
-			p1nulvec = dividecon(POM, p1nul);
+			dividecon(p1nulvec, POM, p1nul);
 
 		}
 
@@ -254,7 +255,7 @@ vector<double*> U(3);
 			 multconst(POM2, l2, l2pl);
 			 subtract(POM, POM1, POM2);
 
-			p2nulvec = dividecon(POM, p2nul);
+			dividecon(p2nulvec, POM, p2nul);
 
 		}
 
@@ -269,7 +270,7 @@ vector<double*> U(3);
 			subtract(POM1, rho1, rho);
 			multconst(POM2, l3, l3pl);
 			subtract(POM, POM1, POM2);
-			p3nulvec = dividecon(POM, p3nul);
+			dividecon(p3nulvec, POM, p3nul);
 
 		}
 
@@ -343,7 +344,7 @@ vector<double*> U(3);
 
 
 			multconst(pomVEC, U[iv], CONST1);
-			Ivec = add(Ivec, pomVEC);
+			add(Ivec, Ivec, pomVEC);
 
 		}
 
@@ -410,7 +411,7 @@ vector<double*> U(3);
 				subtract(rhotmp, rho, rho0N);
 				multconst(pomVec1, rhotmp, Isca);
 
-				double* pomVec2 = add(Ivec, pomVec1);
+				 add(pomVec2, Ivec, pomVec1);
 
 				multconst(Ikon, pomVec2, K2);
 
