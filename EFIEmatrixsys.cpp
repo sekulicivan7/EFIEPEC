@@ -8,7 +8,7 @@
 #include "EFIEmatrixsys.h"
 #include "Products.h"
 #include <complex>
-
+#include <omp.h>
 
 
 #define COMPLEX complex<double>
@@ -33,32 +33,38 @@ bool is_regular(const Trianinfo &trianF, const Trianinfo &trianS)
 	return true;
 }
 
-double* rho = new double(3);
-double* rho0N =new double(3);
-double* rho1 = new double(3);
-double* rho2 = new double(3);
-double* rho3 = new double(3);
-double* l1 = new double(3);
-double* l2 = new double(3);
-double* l3 = new double(3);
-double* RWGf = new double(3);
-double* RWGs = new double(3);
-double* Ikon = new double(3);
-double* POM = new double(3);
 
-double* KK = new double(3);
-double* npom1 = new double(3);
-double* npom2 = new double(3);
-double* npom3 = new double(3);
-double* POM1 = new double(3);
-double* POM2 = new double(3);
+
+	void singularityEFIE(double &det1, double &AR1, double &AR2, double* p1, double* p2, double* p3,
+	double* q1, double* q2, double* q3, vector<double> &nvec2,
+	vector<vector<double>> &PointsS, vector<double> &WeightsS, int* n1, int* n2,
+	Mesh &mesh, COMPLEX k, vector<COMPLEX> &alok2) {
+	
+  //initialization of local variables
+ double rho[3];
+double rho0N[3];
+double rho1[3];
+double rho2[3];
+double rho3[3];
+double l1[3];
+double l2[3];
+double l3[3];
+double RWGf[3];
+double Ikon[3];
+double POM[3];
+
+double KK[3];
+double npom1[3];
+double npom2[3];
+double npom3[3];
+double POM1[3];
+double POM2[3];
 
  vector<double> fielpoin(3);
- vector<double> sourcepoin(3);
-
-double* u1 = new double(3);
-double* u2 = new double(3);
-double* u3 = new double(3);
+ 
+double u1[3];
+double u2[3];
+double u3[3];
 
 vector<double*> Pnulvec(3);
 vector<double*> U(3);
@@ -73,27 +79,19 @@ vector<double*> U(3);
 	vector<double> Rpl(3);
 	vector<double> Rmn(3);
 
-	double *rhotmp=new double(3);
+	double rhotmp[3];
 	
-	vector<COMPLEX> alok1(9), alok2(9);
-
-	double* vecpom = new double(3);
-	double* p1nulvec = new double(3);
-	double* p2nulvec = new double(3);
-	double* p3nulvec = new double(3);
-	double* pomVEC = new double(3);
-	double* pomVec2= new double(3);;
-	double* pomocvF = new double(3);
-	double* pomocvS = new double(3);
-	double* pomNvec = new double(3);
-	double* pomVec1 = new double(3);
-	double* Ivec = new double(3);
-
-	void singularityEFIE(double &det1, double &AR1, double &AR2, double* p1, double* p2, double* p3,
-	double* q1, double* q2, double* q3, vector<double> &nvec2,
-	vector<vector<double>> &PointsS, vector<double> &WeightsS, int* n1, int* n2,
-	Mesh &mesh, COMPLEX k, vector<COMPLEX> &alok2) {
-
+	double vecpom[3];
+	double p1nulvec[3];
+	double p2nulvec[3];
+	double p3nulvec[3];
+	double pomVEC[3];
+	double pomocvF[3];
+	double pomNvec[3];
+	double pomVec2[3];
+	double pomVec1[3];
+	double Ivec[3];
+  
 	double CONST1;
  	double LOGpl;
 	double LOGmn;
@@ -430,7 +428,6 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 
 {
 
-
 	vector<vector<double>> PointsNS = points.getPointsNS();
 
 	vector<double> WeightsNS = points.getWeightsNS();
@@ -454,9 +451,19 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 	       gran2 = Nt;
 	       
 		}
-
+		
+	#pragma omp parallel for
 	for (int ele1 =gran1; ele1 < gran2; ++ele1)
 	{
+	
+	  //initialization of aux variables
+	    double RWGf[3];
+	    double RWGs[3];
+	    vector<double> fielpoin(3);
+	    vector<double> sourcepoin(3);
+	    vector<COMPLEX> alok1(9), alok2(9);
+	    double pomocvF[3];
+	    double pomocvS[3];
 	
 		int* n1 = mesh.getNOvertex(ele1);
 		//vector<double>  p1(3);
@@ -653,6 +660,7 @@ void assemble_system_matrix(vector<COMPLEX> &Alocal, Mesh &mesh, vector<Trianinf
 					const int s2 = (tmp2 < 0) ? -1 : 1;
 					const int j2 = int(tmp2 * s2 - 1);
 
+					#pragma omp critical
 					Alocal[j1*maxele + j2] += double(1 / (4 * PI))*double(s1 * s2) * alok1[i1 * 3 + i2];
 
 

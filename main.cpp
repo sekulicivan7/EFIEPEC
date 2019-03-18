@@ -12,6 +12,7 @@
 #include <complex>
 #include <time.h>
 #include <Eigen/Dense>
+#include <omp.h>
 
 
 
@@ -185,16 +186,20 @@ int main(int args, char *argv[]) {
 		send_data(Alocal, maxele, numprocs, my_rank);
 	}
 	else {
-
-	start = clock();
-
-	receive_data(Aglobal, maxele, numprocs);
-
-	end = clock();
 	
 	vector<COMPLEX> E(maxele);
 	fill(E.begin(), E.end(), COMPLEX(0));
+
+	start = omp_get_wtime();
+
+	receive_data(Aglobal, maxele, numprocs);
+
+	end = omp_get_wtime();
 	
+	cpu_time_used = ((double) (end - start));
+
+     cout << cpu_time_used << endl;
+
 	EFIE::excvecE::assemble_exic_vector(E, mesh, Triangles, points, Nt, k);
 	
 	MatrixXCPL A(maxele, maxele);
@@ -214,13 +219,9 @@ int main(int args, char *argv[]) {
 	}
 	
 	
-	B = A.colPivHouseholderQr().solve(C); //solve system matrix
+	B = A.partialPivLu().solve(C); //A.colPivHouseholderQr().solve(C); //solve system matrix
 
 	cout << B.sum() << endl;
-
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-        cout << cpu_time_used << endl;
 
 	}
 
